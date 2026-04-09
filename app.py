@@ -33,26 +33,45 @@ st.title("⛽ PetroPulse AI: Fleet Command Center")
 st.markdown("Real-time predictive fuel analytics, route arbitrage, and live spatial tracking.")
 st.divider()
 
-# --- DYNAMIC ROUTE DATA & GPS COORDINATES ---
-# Added 'depot_coords' and 'zoom' levels to auto-focus the camera!
+# --- DYNAMIC ROUTE DATA & HIGHWAY FUEL STATIONS ---
 route_data = {
     "Delhi -> Mumbai": {
         "distance": 1400, "origin_state": "Delhi", "origin_price": 89.62,
         "border_state": "Haryana", "border_price": 87.00, "depot_name": "Haryana Depot #2",
         "origin_coords": (28.6139, 77.2090), "dest_coords": (19.0760, 72.8777),
-        "depot_coords": (28.2000, 76.9000), "zoom": 4.8
+        "zoom": 4.8,
+        # Multiple real-world highway stops
+        "stations": [
+            {"name": "IOCL Neemrana Highway", "coords": (27.98, 76.38), "optimal": False},
+            {"name": "BPCL Jaipur Bypass", "coords": (26.91, 75.78), "optimal": False},
+            {"name": "HPCL Udaipur Stop", "coords": (24.58, 73.68), "optimal": False},
+            {"name": "IOCL Vadodara Plaza", "coords": (22.30, 73.19), "optimal": False},
+            {"name": "⛽ OPTIMAL: Haryana Border Depot (Save ₹2.62/L)", "coords": (28.20, 76.90), "optimal": True}
+        ]
     },
     "Chennai -> Bangalore": {
         "distance": 350, "origin_state": "Tamil Nadu", "origin_price": 92.34,
         "border_state": "Karnataka", "border_price": 89.22, "depot_name": "Hosur Highway Pump",
         "origin_coords": (13.0827, 80.2707), "dest_coords": (12.9716, 77.5946),
-        "depot_coords": (12.7300, 77.8200), "zoom": 6.8
+        "zoom": 6.8,
+        "stations": [
+            {"name": "HPCL Sriperumbudur", "coords": (12.96, 79.94), "optimal": False},
+            {"name": "IOCL Vellore Highway", "coords": (12.91, 79.13), "optimal": False},
+            {"name": "BPCL Krishnagiri Rest Stop", "coords": (12.52, 78.21), "optimal": False},
+            {"name": "⛽ OPTIMAL: Hosur Border Pump (Save ₹3.12/L)", "coords": (12.73, 77.82), "optimal": True}
+        ]
     },
     "Kolkata -> Patna": {
         "distance": 580, "origin_state": "West Bengal", "origin_price": 90.76,
         "border_state": "Jharkhand", "border_price": 88.50, "depot_name": "Dhanbad Border Station",
         "origin_coords": (22.5726, 88.3639), "dest_coords": (25.5941, 85.1376),
-        "depot_coords": (23.7957, 86.4304), "zoom": 5.8
+        "zoom": 5.8,
+        "stations": [
+            {"name": "IOCL Bardhaman Bypass", "coords": (23.23, 87.86), "optimal": False},
+            {"name": "BPCL Asansol Highway", "coords": (23.68, 86.98), "optimal": False},
+            {"name": "HPCL Bihar Sharif Plaza", "coords": (25.19, 85.51), "optimal": False},
+            {"name": "⛽ OPTIMAL: Dhanbad Border Station (Save ₹2.26/L)", "coords": (23.79, 86.43), "optimal": True}
+        ]
     }
 }
 
@@ -172,20 +191,17 @@ with col_arbitrage:
 
 st.divider()
 
-# --- MAIN DASHBOARD: ROW 3 (DYNAMIC AUTO-ZOOM MAP) ---
-st.subheader("🛰️ Active Route Radar & Arbitrage Depot")
-st.caption("Map auto-centers on your active fleet. Hover over markers for details.")
+# --- MAIN DASHBOARD: ROW 3 (DYNAMIC HIGHWAY MAP) ---
+st.subheader("🛰️ Highway Radar & Refill Stations")
+st.caption("Auto-centered on active route. Gray dots = standard pumps. Gold dot = Optimal Arbitrage Pump.")
 
-# 1. Grab coordinates for the Active Route
+# 1. Grab coordinates to center the map
 orig_coords = current_route["origin_coords"]
 dest_coords = current_route["dest_coords"]
-depot_coords = current_route["depot_coords"]
-
-# 2. Calculate the exact mathematical center to focus the camera
 mid_lat = (orig_coords[0] + dest_coords[0]) / 2
 mid_lon = (orig_coords[1] + dest_coords[1]) / 2
 
-# 3. Create DataFrames for PyDeck (Remember PyDeck uses [Longitude, Latitude])
+# 2. Build the visual layers
 df_route = pd.DataFrame([{
     "start": [orig_coords[1], orig_coords[0]], 
     "end": [dest_coords[1], dest_coords[0]],
@@ -193,24 +209,35 @@ df_route = pd.DataFrame([{
 }])
 
 df_cities = pd.DataFrame([
-    {"coords": [orig_coords[1], orig_coords[0]], "name": f"Origin: {demo_origin}", "color": [0, 255, 204, 200]},
-    {"coords": [dest_coords[1], dest_coords[0]], "name": f"Destination: {demo_dest}", "color": [255, 0, 128, 200]}
+    {"coords": [orig_coords[1], orig_coords[0]], "name": f"Origin: {demo_origin}", "color": [0, 255, 204, 255]},
+    {"coords": [dest_coords[1], dest_coords[0]], "name": f"Destination: {demo_dest}", "color": [255, 0, 128, 255]}
 ])
 
-df_depot = pd.DataFrame([{
-    "coords": [depot_coords[1], depot_coords[0]],
-    "name": f"⛽ OPTIMAL REFILL: {current_route['depot_name']} (Save ₹{price_diff:.2f}/L)",
-    "color": [255, 215, 0, 255] # Solid Gold
-}])
+# Process the stations for the selected route
+standard_stations = []
+optimal_stations = []
 
-# 4. Build the Map Layers
+for station in current_route["stations"]:
+    # Coordinates in PyDeck are ALWAYS [Longitude, Latitude]
+    point = {"coords": [station["coords"][1], station["coords"][0]], "name": station["name"]}
+    if station["optimal"]:
+        point["color"] = [255, 215, 0, 255] # Solid Gold
+        optimal_stations.append(point)
+    else:
+        point["color"] = [200, 200, 200, 200] # Light Grey
+        standard_stations.append(point)
+
+df_standard = pd.DataFrame(standard_stations)
+df_optimal = pd.DataFrame(optimal_stations)
+
+# 3. Create PyDeck Layers
 layer_line = pdk.Layer(
     "LineLayer",
     data=df_route,
     get_source_position="start",
     get_target_position="end",
-    get_color=[255, 255, 255, 100], # Subtle white line for the route
-    get_width=3,
+    get_color=[255, 255, 255, 60], # Faint white line representing the highway
+    get_width=2,
 )
 
 layer_cities = pdk.Layer(
@@ -218,30 +245,39 @@ layer_cities = pdk.Layer(
     data=df_cities,
     get_position="coords",
     get_color="color",
-    get_radius=15000,
+    get_radius=8000, # Much smaller!
     pickable=True
 )
 
-layer_depot = pdk.Layer(
+layer_standard_pumps = pdk.Layer(
     "ScatterplotLayer",
-    data=df_depot,
+    data=df_standard,
     get_position="coords",
     get_color="color",
-    get_radius=25000, # Make the fuel station larger than the cities
+    get_radius=4000, # Tiny pins for regular gas stations
     pickable=True
 )
 
-# 5. Render the Map with Auto-Zoom
+layer_optimal_pump = pdk.Layer(
+    "ScatterplotLayer",
+    data=df_optimal,
+    get_position="coords",
+    get_color="color",
+    get_radius=9000, # Slightly bigger so it stands out
+    pickable=True
+)
+
+# 4. Render the Map
 st.pydeck_chart(pdk.Deck(
     map_provider="carto",
     map_style="dark",
     initial_view_state=pdk.ViewState(
         latitude=mid_lat, 
         longitude=mid_lon,
-        zoom=current_route["zoom"], # Uses custom zoom based on route length!
+        zoom=current_route["zoom"], 
         pitch=0, 
     ),
-    layers=[layer_line, layer_cities, layer_depot],
+    layers=[layer_line, layer_standard_pumps, layer_optimal_pump, layer_cities],
     tooltip={"text": "{name}"} 
 ))
 
