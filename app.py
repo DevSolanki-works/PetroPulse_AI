@@ -34,32 +34,26 @@ st.markdown("Real-time predictive fuel analytics, route arbitrage, and live spat
 st.divider()
 
 # --- DYNAMIC ROUTE DATA & GPS COORDINATES ---
-# Main Demo Routes for Arbitrage
+# Added 'depot_coords' and 'zoom' levels to auto-focus the camera!
 route_data = {
     "Delhi -> Mumbai": {
         "distance": 1400, "origin_state": "Delhi", "origin_price": 89.62,
-        "border_state": "Haryana", "border_price": 87.00, "depot_name": "Depot #2",
-        "origin_coords": (28.6139, 77.2090), "dest_coords": (19.0760, 72.8777)
+        "border_state": "Haryana", "border_price": 87.00, "depot_name": "Haryana Depot #2",
+        "origin_coords": (28.6139, 77.2090), "dest_coords": (19.0760, 72.8777),
+        "depot_coords": (28.2000, 76.9000), "zoom": 4.8
     },
     "Chennai -> Bangalore": {
         "distance": 350, "origin_state": "Tamil Nadu", "origin_price": 92.34,
         "border_state": "Karnataka", "border_price": 89.22, "depot_name": "Hosur Highway Pump",
-        "origin_coords": (13.0827, 80.2707), "dest_coords": (12.9716, 77.5946)
+        "origin_coords": (13.0827, 80.2707), "dest_coords": (12.9716, 77.5946),
+        "depot_coords": (12.7300, 77.8200), "zoom": 6.8
     },
     "Kolkata -> Patna": {
         "distance": 580, "origin_state": "West Bengal", "origin_price": 90.76,
         "border_state": "Jharkhand", "border_price": 88.50, "depot_name": "Dhanbad Border Station",
-        "origin_coords": (22.5726, 88.3639), "dest_coords": (25.5941, 85.1376)
+        "origin_coords": (22.5726, 88.3639), "dest_coords": (25.5941, 85.1376),
+        "depot_coords": (23.7957, 86.4304), "zoom": 5.8
     }
-}
-
-# Master City Dictionary based on your CSV Data
-city_coords = {
-    "Pune": [18.5204, 73.8567], "Mumbai": [19.0760, 72.8777],
-    "Ahmedabad": [23.0225, 72.5714], "Chennai": [13.0827, 80.2707],
-    "Bangalore": [12.9716, 77.5946], "Jaipur": [26.9124, 75.7873],
-    "Delhi": [28.6139, 77.2090], "Kolkata": [22.5726, 88.3639],
-    "Patna": [25.5941, 85.1376]
 }
 
 # --- SIDEBAR (User Inputs) ---
@@ -83,7 +77,6 @@ def fetch_live_weather(lat, lon):
         temp = response['current_weather']['temperature']
         wind = response['current_weather']['windspeed']
         code = response['current_weather']['weathercode']
-        
         if code <= 3: condition = "Clear ☀️"
         elif code <= 48: condition = "Cloudy ☁️"
         elif code <= 67: condition = "Rain 🌧️"
@@ -153,7 +146,6 @@ with col_chart:
     st.subheader("📈 Live Fuel Price Forecast")
     past_dates = [datetime.today() - timedelta(days=x) for x in range(len(crude_trend)-1, -1, -1)]
     future_dates = [datetime.today() + timedelta(days=x) for x in range(1, 31)]
-    
     base_price = current_route["origin_price"]
     historical_prices = base_price * crude_trend
     volatility = np.std(crude_trend) * base_price
@@ -162,7 +154,6 @@ with col_chart:
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=past_dates, y=historical_prices, mode='lines', name='Actual Market Trend', line=dict(color='white', width=2)))
     fig.add_trace(go.Scatter(x=future_dates, y=predicted_prices, mode='lines', name='AI ML Forecast', line=dict(color='#00FFCC', width=3, dash='dash')))
-    
     fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="white", height=350, margin=dict(l=0, r=0, t=30, b=0))
     st.plotly_chart(fig, width="stretch")
 
@@ -181,58 +172,78 @@ with col_arbitrage:
 
 st.divider()
 
-# --- MAIN DASHBOARD: ROW 3 (3D LIVE FLEET MAP) ---
-st.subheader("🛰️ Live Fleet Tracking & Arbitrage Depots")
-st.caption("Reads directly from Truck-route.csv to plot active logistics networks.")
+# --- MAIN DASHBOARD: ROW 3 (DYNAMIC AUTO-ZOOM MAP) ---
+st.subheader("🛰️ Active Route Radar & Arbitrage Depot")
+st.caption("Map auto-centers on your active fleet. Hover over markers for details.")
 
-# Parse the CSV to get live routes
-try:
-    df_trucks = pd.read_csv("Truck-route.csv", sep=None, engine='python')
-    map_lines = []
-    
-    # Process the 'route' column from your CSV (e.g., 'Pune-Mumbai')
-    for route_str in df_trucks['route'].dropna().unique():
-        try:
-            start_city, end_city = route_str.split('-')
-            if start_city in city_coords and end_city in city_coords:
-                map_lines.append({
-                    "start": city_coords[start_city],
-                    "end": city_coords[end_city],
-                    "name": route_str
-                })
-        except:
-            continue
-            
-    df_map = pd.DataFrame(map_lines)
-    
-    # The glowing flight paths for the trucks
-    layer_arcs = pdk.Layer(
-        "ArcLayer",
-        data=df_map,
-        get_source_position="[start[1], start[0]]", # Longitude, Latitude
-        get_target_position="[end[1], end[0]]",
-        get_source_color=[0, 255, 204, 160], # Cyan
-        get_target_color=[255, 0, 128, 160], # Pink
-        get_width=4,
-        pitch=45
-    )
-    
-    # Render the 3D Map
-    # Render the 3D Map
-    st.pydeck_chart(pdk.Deck(
-        map_provider="carto",           # FIXED: Uses free open-source map provider
-        map_style="dark",               # FIXED: Uses free dark mode theme
-        initial_view_state=pdk.ViewState(
-            latitude=21.0, # Center of India
-            longitude=78.0,
-            zoom=4,
-            pitch=50,
-        ),
-        layers=[layer_arcs]
-    ))
+# 1. Grab coordinates for the Active Route
+orig_coords = current_route["origin_coords"]
+dest_coords = current_route["dest_coords"]
+depot_coords = current_route["depot_coords"]
 
-except Exception as e:
-    st.error(f"Could not load map data from CSV: {e}")
+# 2. Calculate the exact mathematical center to focus the camera
+mid_lat = (orig_coords[0] + dest_coords[0]) / 2
+mid_lon = (orig_coords[1] + dest_coords[1]) / 2
+
+# 3. Create DataFrames for PyDeck (Remember PyDeck uses [Longitude, Latitude])
+df_route = pd.DataFrame([{
+    "start": [orig_coords[1], orig_coords[0]], 
+    "end": [dest_coords[1], dest_coords[0]],
+    "name": route_select
+}])
+
+df_cities = pd.DataFrame([
+    {"coords": [orig_coords[1], orig_coords[0]], "name": f"Origin: {demo_origin}", "color": [0, 255, 204, 200]},
+    {"coords": [dest_coords[1], dest_coords[0]], "name": f"Destination: {demo_dest}", "color": [255, 0, 128, 200]}
+])
+
+df_depot = pd.DataFrame([{
+    "coords": [depot_coords[1], depot_coords[0]],
+    "name": f"⛽ OPTIMAL REFILL: {current_route['depot_name']} (Save ₹{price_diff:.2f}/L)",
+    "color": [255, 215, 0, 255] # Solid Gold
+}])
+
+# 4. Build the Map Layers
+layer_line = pdk.Layer(
+    "LineLayer",
+    data=df_route,
+    get_source_position="start",
+    get_target_position="end",
+    get_color=[255, 255, 255, 100], # Subtle white line for the route
+    get_width=3,
+)
+
+layer_cities = pdk.Layer(
+    "ScatterplotLayer",
+    data=df_cities,
+    get_position="coords",
+    get_color="color",
+    get_radius=15000,
+    pickable=True
+)
+
+layer_depot = pdk.Layer(
+    "ScatterplotLayer",
+    data=df_depot,
+    get_position="coords",
+    get_color="color",
+    get_radius=25000, # Make the fuel station larger than the cities
+    pickable=True
+)
+
+# 5. Render the Map with Auto-Zoom
+st.pydeck_chart(pdk.Deck(
+    map_provider="carto",
+    map_style="dark",
+    initial_view_state=pdk.ViewState(
+        latitude=mid_lat, 
+        longitude=mid_lon,
+        zoom=current_route["zoom"], # Uses custom zoom based on route length!
+        pitch=0, 
+    ),
+    layers=[layer_line, layer_cities, layer_depot],
+    tooltip={"text": "{name}"} 
+))
 
 st.divider()
 
@@ -261,7 +272,6 @@ with col_chat:
     if "messages" not in st.session_state:
         st.session_state.messages = [{"role": "assistant", "content": "Hello! I am monitoring the map, weather, and market. How can I help?"}]
     
-    # We use a container to keep the chat tidy next to the backhaul matcher
     chat_container = st.container(height=300)
     for message in st.session_state.messages:
         with chat_container.chat_message(message["role"]):
