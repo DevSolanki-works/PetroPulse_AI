@@ -320,13 +320,29 @@ with col_chat:
         with st.spinner("Analyzing..."):
             try:
                 system_context = f"""
-                You are PetroPulse AI. Route: {route_select}. Savings: ₹{price_diff:.2f}/L.
-                Weather: Origin({o_cond}), Dest({d_cond}). 
-                Answer concisely based on this data.
+                You are PetroPulse AI, an elite logistics financial advisor for India. 
+                
+                CURRENT DASHBOARD CONTEXT:
+                - Route: {route_select} (Distance: {current_route['distance']} km).
+                - Fleet: {fleet_size} trucks. Mileage: {avg_mileage} kmpl.
+                - Weather: Origin({o_cond}), Dest({d_cond}).
+                - Arbitrage Savings: ₹{price_diff:.2f}/L at {current_route['border_state']} border.
+                - Live Brent Crude: ${brent_val:.2f}. USD/INR: ₹{inr_val:.2f}.
+                
+                CRITICAL INSTRUCTION FOR UNKNOWN ROUTES:
+                If the user asks about a route NOT listed in the current dashboard context (e.g., Jammu to Chennai, or any other random cities), DO NOT say you don't have data. Instead, provide a highly educated APPROXIMATION:
+                1. Estimate the driving distance between the two cities in kilometers.
+                2. Use the user's provided fleet size ({fleet_size} trucks) and mileage ({avg_mileage} kmpl) to calculate the estimated total fuel required.
+                3. Assume a rough national average diesel price of ₹90/L to calculate estimated costs.
+                4. Name 1 or 2 state borders along that route where tax arbitrage (refueling) might be beneficial based on your general knowledge of Indian state taxes.
+                
+                Always be helpful, professional, and act like a senior logistics consultant.
                 """
+                
                 response = model.generate_content(system_context + "\nUser: " + prompt)
                 with chat_container.chat_message("assistant"):
                     st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
             except Exception as e:
                 st.error("AI Error.")
+
