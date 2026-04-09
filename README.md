@@ -27,3 +27,4 @@ By combining real-time global market data, custom Machine Learning models, and a
    ```bash
    git clone [https://github.com/YourUsername/PetroPulse-AI.git](https://github.com/YourUsername/PetroPulse-AI.git)
    cd PetroPulse-AI
+2. **Streamlit URL:** https://petropulseai-bvmp5dnm97mdjfsomuqkst.streamlit.app/
