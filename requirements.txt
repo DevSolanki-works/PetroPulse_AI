@@ -1,0 +1,11 @@
+streamlit
+google-generativeai
+pandas
+numpy
+scikit-learn
+plotly
+yfinance
+requests
+pydeck
+mcp
+python-dotenv
