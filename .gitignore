@@ -1,1 +1,14 @@
 .env
+
+# Virtual Environments
+venv/
+env/
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Pickled ML Models (Optional: only ignore these if they are too large for GitHub)
+# *.pkl
