@@ -147,6 +147,44 @@ with col_arbitrage:
         st.metric(label="Projected Trip Savings", value=f"₹{savings:,.2f}")
 
 st.divider()
+# --- MAIN DASHBOARD: ROW 2.5 (Backhaul Matcher) ---
+st.subheader("🔄 Backhaul Load Matcher (Eliminate Empty Miles)")
+
+# Calculate the return journey based on the active route selection
+origin_city = current_route["origin_state"] # Note: We use the state names from your route_data dictionary
+dest_city = current_route["border_state"]
+
+# In a real app, we'd map states to cities. For the demo, we do a quick text split from the route_select string!
+demo_origin = route_select.split(" -> ")[0]
+demo_dest = route_select.split(" -> ")[1]
+
+st.info(f"**Live Radar:** Scanning freight exchanges for empty trucks returning from **{demo_dest}** to **{demo_origin}**.")
+
+col_b1, col_b2 = st.columns([3, 1])
+
+with col_b1:
+    if st.button("Scan for Return Loads", width="stretch", type="primary"):
+        with st.spinner("Querying live load boards..."):
+            import time
+            time.sleep(1) # Fake loading for dramatic effect
+            
+            # Match the revenue to our mock MCP database
+            revenue_map = {"Mumbai": 45000, "Bangalore": 32000, "Patna": 28000}
+            backhaul_rev = revenue_map.get(demo_dest, 30000)
+            
+            st.success(f"✅ **Instant Match Found!** Priority load available at {demo_dest} logistics park heading directly to {demo_origin}.")
+            
+            # Show the extra money made
+            st.metric(label="New Revenue Generated (Offsetting Fuel Costs)", value=f"+ ₹{backhaul_rev:,.2f}", delta="Profit Margin Protected")
+
+with col_b2:
+    st.markdown("""
+    **Algorithm Status:**
+    * API: Connected
+    * Deadhead Risk: Mitigated
+    """)
+
+st.divider()
 
 # --- MAIN DASHBOARD: ROW 3 (AI Transition Advisor) ---
 st.subheader("🧠 Generative AI Strategic Advisor")
@@ -195,6 +233,8 @@ if prompt := st.chat_input(f"E.g., How much will fuel cost for my {fleet_size} t
             - There is a tax arbitrage opportunity at the {current_route['border_state']} border where the price is ₹{current_route['border_price']}.
             - This saves ₹{price_diff:.2f} per liter.
             
+            - BACKHAUL MATCHER: You also have a Backhaul Load Matcher. If the user asks how to make more money or eliminate "empty miles", suggest they use the Backhaul Matcher to find a return load from their destination.
+
             LIVE MARKET DATA:
             - Brent Crude is currently at ${brent_val:.2f}.
             - USD to INR is at ₹{inr_val:.2f}.
