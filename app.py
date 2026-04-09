@@ -1,11 +1,16 @@
 # app.py
-import google.generativeai as genai
 import os
+from dotenv import load_dotenv
+import google.generativeai as genai
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+
+# --- LOAD SECRETS ---
+load_dotenv() # This reads the .env file!
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") # This securely grabs your key
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="PetroPulse AI", page_icon="⛽", layout="wide")
@@ -67,7 +72,8 @@ with col_chart:
     fig.add_trace(go.Scatter(x=dates[29:], y=predicted_prices, mode='lines', name='AI Forecast', line=dict(color='#00FFCC', width=3, dash='dash')))
     
     fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="white", height=350, margin=dict(l=0, r=0, t=30, b=0))
-    st.plotly_chart(fig, use_container_width=True)
+    # Fixed deprecation warning here:
+    st.plotly_chart(fig, width="stretch")
 
 with col_arbitrage:
     st.subheader("🗺️ State-Tax Arbitrage")
@@ -80,7 +86,8 @@ with col_arbitrage:
     
     st.metric(label="Haryana Border Price", value="₹87.00 / L", delta="-₹2.62 vs Delhi")
     
-    if st.button("Calculate Route Savings", use_container_width=True):
+    # Fixed deprecation warning here:
+    if st.button("Calculate Route Savings", width="stretch"):
         distance = 1400 # Delhi to Mumbai approx
         fuel_needed = distance / avg_mileage
         savings = fuel_needed * 2.62
@@ -105,10 +112,13 @@ st.divider()
 st.subheader("💬 PetroPulse AI Co-Pilot")
 st.caption("Ask me to analyze routes, predict costs, or suggest hedging strategies.")
 
-GEMINI_API_KEY = "AIzaSyDfYzZ8WQoMj0caUPlkS8xsHKFY9sGVeSc" 
-genai.configure(api_key=GEMINI_API_KEY)
+# Ensure the key is loaded
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    st.error("API Key not found! Please check your .env file.")
 
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
@@ -128,9 +138,6 @@ if prompt := st.chat_input("E.g., What is the tax arbitrage for Delhi to Haryana
     with st.spinner("Analyzing fleet data and market trends..."):
         try:
             # --- THE HACKATHON SHORTCUT ---
-            # In a full production app, this is where the MCP Client sends the prompt to the MCP Server.
-            # For this 36-hour sprint, we inject the dashboard context directly into Gemini's prompt so it acts like the orchestrator.
-            
             system_context = f"""
             You are the PetroPulse AI Co-Pilot, an expert logistics financial advisor. 
             The user currently has a fleet size of {fleet_size} trucks, averaging {avg_mileage} kmpl. 
@@ -152,4 +159,3 @@ if prompt := st.chat_input("E.g., What is the tax arbitrage for Delhi to Haryana
             
         except Exception as e:
             st.error(f"Error connecting to AI Orchestrator: {e}")
-
