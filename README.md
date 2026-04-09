@@ -2,6 +2,15 @@
 
 ![PetroPulse Header](https://img.shields.io/badge/Status-Hackathon_Ready-success) ![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B) ![Gemini](https://img.shields.io/badge/AI-Google_Gemini-orange)
 
+## 💻 Installation & Local Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone [https://github.com/YourUsername/PetroPulse-AI.git](https://github.com/YourUsername/PetroPulse-AI.git)
+   cd PetroPulse-AI
+2. **Streamlit URL:** https://petropulseai-bvmp5dnm97mdjfsomuqkst.streamlit.app/
+
+## ABOUT
 PetroPulse AI is an intelligent logistics dashboard built to solve the two biggest profit-killers in the Indian transport industry: **fuel price volatility** and **empty return miles (deadhead)**.
 
 By combining real-time global market data, custom Machine Learning models, and an autonomous AI Orchestrator, PetroPulse transforms static fleet data into actionable, profit-generating strategies.
@@ -21,10 +30,4 @@ By combining real-time global market data, custom Machine Learning models, and a
 * **Machine Learning:** Scikit-Learn, Pandas, NumPy
 * **Live Data Integration:** YFinance (Market), Requests (Weather API)
 
-## 💻 Installation & Local Setup
 
-1. **Clone the repository**
-   ```bash
-   git clone [https://github.com/YourUsername/PetroPulse-AI.git](https://github.com/YourUsername/PetroPulse-AI.git)
-   cd PetroPulse-AI
-2. **Streamlit URL:** https://petropulseai-bvmp5dnm97mdjfsomuqkst.streamlit.app/
