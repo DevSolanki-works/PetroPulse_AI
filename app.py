@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
 import requests
+import pydeck as pdk
 
 # --- LOAD SECRETS ---
 load_dotenv() 
@@ -29,10 +30,11 @@ st.markdown("""
 
 # --- HEADER ---
 st.title("⛽ PetroPulse AI: Fleet Command Center")
-st.markdown("Real-time predictive fuel analytics, route arbitrage, and live weather tracking.")
+st.markdown("Real-time predictive fuel analytics, route arbitrage, and live spatial tracking.")
 st.divider()
 
 # --- DYNAMIC ROUTE DATA & GPS COORDINATES ---
+# Main Demo Routes for Arbitrage
 route_data = {
     "Delhi -> Mumbai": {
         "distance": 1400, "origin_state": "Delhi", "origin_price": 89.62,
@@ -51,6 +53,15 @@ route_data = {
     }
 }
 
+# Master City Dictionary based on your CSV Data
+city_coords = {
+    "Pune": [18.5204, 73.8567], "Mumbai": [19.0760, 72.8777],
+    "Ahmedabad": [23.0225, 72.5714], "Chennai": [13.0827, 80.2707],
+    "Bangalore": [12.9716, 77.5946], "Jaipur": [26.9124, 75.7873],
+    "Delhi": [28.6139, 77.2090], "Kolkata": [22.5726, 88.3639],
+    "Patna": [25.5941, 85.1376]
+}
+
 # --- SIDEBAR (User Inputs) ---
 with st.sidebar:
     st.header("⚙️ Fleet Parameters")
@@ -64,7 +75,7 @@ demo_origin = route_select.split(" -> ")[0]
 demo_dest = route_select.split(" -> ")[1]
 
 # --- LIVE WEATHER FETCHER ---
-@st.cache_data(ttl=600) # Caches weather for 10 minutes
+@st.cache_data(ttl=600)
 def fetch_live_weather(lat, lon):
     try:
         url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
@@ -73,12 +84,10 @@ def fetch_live_weather(lat, lon):
         wind = response['current_weather']['windspeed']
         code = response['current_weather']['weathercode']
         
-        # Determine weather condition
         if code <= 3: condition = "Clear ☀️"
         elif code <= 48: condition = "Cloudy ☁️"
         elif code <= 67: condition = "Rain 🌧️"
         else: condition = "Storm/Heavy Rain ⛈️"
-        
         return temp, wind, condition
     except:
         return "--", "--", "API Error ⚠️"
@@ -86,26 +95,18 @@ def fetch_live_weather(lat, lon):
 o_temp, o_wind, o_cond = fetch_live_weather(current_route["origin_coords"][0], current_route["origin_coords"][1])
 d_temp, d_wind, d_cond = fetch_live_weather(current_route["dest_coords"][0], current_route["dest_coords"][1])
 
-# --- ADD WEATHER TO SIDEBAR ---
 with st.sidebar:
     st.markdown("---")
     st.header("🌤️ Live Route Weather")
-    
     st.caption(f"📍 Origin: {demo_origin}")
     st.write(f"**{o_cond}** | {o_temp}°C | 💨 {o_wind} km/h")
-    
     st.caption(f"🏁 Destination: {demo_dest}")
     st.write(f"**{d_cond}** | {d_temp}°C | 💨 {d_wind} km/h")
     
     if "Rain" in o_cond or "Rain" in d_cond or "Storm" in o_cond or "Storm" in d_cond:
-        st.error("⚠️ **ALERT:** Adverse weather detected on route. Reduce speeds and update ETAs.")
+        st.error("⚠️ **ALERT:** Adverse weather detected on route. Reduce speeds.")
     else:
-        st.success("✅ Route weather is optimal for transit.")
-        
-    st.markdown("---")
-    st.header("🤖 FastMCP Status")
-    st.success("Connected to PetroPulse Orchestrator")
-    st.caption("AI Tools Active: Prophet ML, Arbitrage, Backhaul, Weather")
+        st.success("✅ Route weather optimal.")
 
 # --- LIVE FINANCIAL DATA FETCHER ---
 @st.cache_data(ttl=300) 
@@ -149,14 +150,12 @@ st.divider()
 col_chart, col_arbitrage = st.columns([2, 1])
 
 with col_chart:
-    st.subheader("📈 Live Fuel Price Forecast (Crude-Mapped)")
-    
+    st.subheader("📈 Live Fuel Price Forecast")
     past_dates = [datetime.today() - timedelta(days=x) for x in range(len(crude_trend)-1, -1, -1)]
     future_dates = [datetime.today() + timedelta(days=x) for x in range(1, 31)]
     
     base_price = current_route["origin_price"]
     historical_prices = base_price * crude_trend
-    
     volatility = np.std(crude_trend) * base_price
     predicted_prices = np.linspace(base_price, base_price + 3.60, 30) + np.random.normal(0, volatility, 30)
     
@@ -182,95 +181,106 @@ with col_arbitrage:
 
 st.divider()
 
-# --- MAIN DASHBOARD: ROW 2.5 (Backhaul Matcher) ---
-st.subheader("🔄 Backhaul Load Matcher (Eliminate Empty Miles)")
+# --- MAIN DASHBOARD: ROW 3 (3D LIVE FLEET MAP) ---
+st.subheader("🛰️ Live Fleet Tracking & Arbitrage Depots")
+st.caption("Reads directly from Truck-route.csv to plot active logistics networks.")
 
-st.info(f"**Live Radar:** Scanning freight exchanges for empty trucks returning from **{demo_dest}** to **{demo_origin}**.")
-col_b1, col_b2 = st.columns([3, 1])
+# Parse the CSV to get live routes
+try:
+    df_trucks = pd.read_csv("Truck-route.csv", sep=None, engine='python')
+    map_lines = []
+    
+    # Process the 'route' column from your CSV (e.g., 'Pune-Mumbai')
+    for route_str in df_trucks['route'].dropna().unique():
+        try:
+            start_city, end_city = route_str.split('-')
+            if start_city in city_coords and end_city in city_coords:
+                map_lines.append({
+                    "start": city_coords[start_city],
+                    "end": city_coords[end_city],
+                    "name": route_str
+                })
+        except:
+            continue
+            
+    df_map = pd.DataFrame(map_lines)
+    
+    # The glowing flight paths for the trucks
+    layer_arcs = pdk.Layer(
+        "ArcLayer",
+        data=df_map,
+        get_source_position="[start[1], start[0]]", # Longitude, Latitude
+        get_target_position="[end[1], end[0]]",
+        get_source_color=[0, 255, 204, 160], # Cyan
+        get_target_color=[255, 0, 128, 160], # Pink
+        get_width=4,
+        pitch=45
+    )
+    
+    # Render the 3D Map
+    # Render the 3D Map
+    st.pydeck_chart(pdk.Deck(
+        map_provider="carto",           # FIXED: Uses free open-source map provider
+        map_style="dark",               # FIXED: Uses free dark mode theme
+        initial_view_state=pdk.ViewState(
+            latitude=21.0, # Center of India
+            longitude=78.0,
+            zoom=4,
+            pitch=50,
+        ),
+        layers=[layer_arcs]
+    ))
 
-with col_b1:
+except Exception as e:
+    st.error(f"Could not load map data from CSV: {e}")
+
+st.divider()
+
+# --- MAIN DASHBOARD: ROW 4 (Backhaul & AI Co-Pilot) ---
+col_backhaul, col_chat = st.columns([1, 1])
+
+with col_backhaul:
+    st.subheader("🔄 Backhaul Load Matcher")
+    st.info(f"**Live Radar:** Scanning freight exchanges for empty trucks returning from **{demo_dest}** to **{demo_origin}**.")
     if st.button("Scan for Return Loads", width="stretch", type="primary"):
         with st.spinner("Querying live load boards..."):
             time.sleep(1.5) 
             revenue_map = {"Mumbai": 45000, "Bangalore": 32000, "Patna": 28000}
             backhaul_rev = revenue_map.get(demo_dest, 30000)
-            
-            st.success(f"✅ **Instant Match Found!** Priority load available at {demo_dest} logistics park heading directly to {demo_origin}.")
-            st.metric(label="New Revenue Generated (Offsetting Fuel Costs)", value=f"+ ₹{backhaul_rev:,.2f}", delta="Profit Margin Protected")
+            st.success(f"✅ **Instant Match Found!** Priority load available at {demo_dest}.")
+            st.metric(label="New Revenue Generated", value=f"+ ₹{backhaul_rev:,.2f}")
 
-with col_b2:
-    st.markdown("""
-    **Algorithm Status:**
-    * API: Connected
-    * Deadhead Risk: Mitigated
-    """)
-
-st.divider()
-
-# --- MAIN DASHBOARD: ROW 3 (AI Transition Advisor) ---
-st.subheader("🧠 Generative AI Strategic Advisor")
-with st.expander("View AI Business Expansion Analysis (LLM Output)", expanded=True):
-    st.write(f"""
-    Based on live crude volatility ({brent_delta:.2f}%) and upward trends in {current_route['origin_state']}, **PetroPulse AI recommends:**
+with col_chat:
+    st.subheader("💬 PetroPulse AI Co-Pilot")
+    if GEMINI_API_KEY:
+        genai.configure(api_key=GEMINI_API_KEY)
+    else:
+        st.error("API Key not found!")
     
-    1. **Immediate Hedging:** Lock in a bulk fuel contract for 40% of volume before the 1st of the month.
-    2. **Route Optimization:** Ensure all {fleet_size} trucks utilize the {current_route['border_state']} arbitrage zone.
-    3. **Backhaul Mandate:** Require dispatchers to accept {demo_dest} return loads.
-    """)
-
-st.divider()
-st.subheader("💬 PetroPulse AI Co-Pilot")
-st.caption("Ask me to analyze routes, predict costs, or suggest hedging strategies.")
-
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-else:
-    st.error("API Key not found! Please check your .env file.")
-
-model = genai.GenerativeModel('gemini-2.5-flash')
-
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Hello! I am the PetroPulse Orchestrator. I can see your selected route, weather conditions, and live market parameters. How can I optimize your logistics today?"}
-    ]
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-if prompt := st.chat_input(f"E.g., How much will fuel cost for my {fleet_size} trucks on this route?"):
-    st.chat_message("user").markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
-
-    with st.spinner("Analyzing fleet data, market trends, and weather..."):
-        try:
-            system_context = f"""
-            You are the PetroPulse AI Co-Pilot. 
-            Fleet size: {fleet_size} trucks. Mileage: {avg_mileage} kmpl. 
-            Route: {route_select} (Distance: {current_route['distance']} km).
+    model = genai.GenerativeModel('gemini-2.5-flash')
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": "Hello! I am monitoring the map, weather, and market. How can I help?"}]
+    
+    # We use a container to keep the chat tidy next to the backhaul matcher
+    chat_container = st.container(height=300)
+    for message in st.session_state.messages:
+        with chat_container.chat_message(message["role"]):
+            st.markdown(message["content"])
             
-            LIVE WEATHER DATA:
-            - Origin ({demo_origin}): {o_temp}°C, {o_cond}, Wind: {o_wind} km/h.
-            - Destination ({demo_dest}): {d_temp}°C, {d_cond}, Wind: {d_wind} km/h.
-            *If the weather is "Rain" or "Storm", warn the user about potential delays or lower fuel efficiency.*
-
-            Origin Price: ₹{current_route['origin_price']}. Border Price: ₹{current_route['border_price']}.
-            Savings per liter: ₹{price_diff:.2f}.
-            Live Brent Crude: ${brent_val:.2f}. USD/INR: ₹{inr_val:.2f}.
-            
-            Always suggest the Backhaul Matcher if they ask about returning empty or making more profit.
-            """
-            
-            full_prompt = system_context + "\nUser Query: " + prompt
-            response = model.generate_content(full_prompt)
-            reply = response.text
-            
-            with st.chat_message("assistant"):
-                st.markdown(reply)
-            st.session_state.messages.append({"role": "assistant", "content": reply})
-            
-        except Exception as e:
-            st.error(f"Error connecting to AI Orchestrator: {e}")
-
-
-
+    if prompt := st.chat_input("Ask about routes, weather, or savings..."):
+        chat_container.chat_message("user").markdown(prompt)
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        
+        with st.spinner("Analyzing..."):
+            try:
+                system_context = f"""
+                You are PetroPulse AI. Route: {route_select}. Savings: ₹{price_diff:.2f}/L.
+                Weather: Origin({o_cond}), Dest({d_cond}). 
+                Answer concisely based on this data.
+                """
+                response = model.generate_content(system_context + "\nUser: " + prompt)
+                with chat_container.chat_message("assistant"):
+                    st.markdown(response.text)
+                st.session_state.messages.append({"role": "assistant", "content": response.text})
+            except Exception as e:
+                st.error("AI Error.")
