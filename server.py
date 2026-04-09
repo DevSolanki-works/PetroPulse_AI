@@ -75,6 +75,36 @@ def calculate_arbitrage(distance: float, price_state_a: float, price_state_b: fl
         "savings_inr": round(savings, 2)
     }
 
+# ==========================================
+# TOOL 4: Backhaul Load Matcher
+# ==========================================
+@mcp.tool()
+def find_backhaul_load(destination_city: str, origin_city: str, capacity_tons: float) -> dict:
+    """
+    Finds available freight loads for trucks returning empty from their destination.
+    Use this when calculating total round-trip profitability or reducing empty miles.
+    """
+    # HACKATHON MOCK DATABASE: Simulating a live freight exchange board
+    available_loads = [
+        {"from": "Mumbai", "to": "Delhi", "commodity": "Electronics", "weight": 18, "revenue": 45000},
+        {"from": "Bangalore", "to": "Chennai", "commodity": "Auto Parts", "weight": 22, "revenue": 32000},
+        {"from": "Patna", "to": "Kolkata", "commodity": "Textiles", "weight": 15, "revenue": 28000}
+    ]
+    
+    # Search for a match
+    for load in available_loads:
+        if load["from"] == destination_city and load["to"] == origin_city and load["weight"] <= capacity_tons:
+            return {
+                "status": "MATCH FOUND",
+                "load_details": f"{load['weight']} Tons of {load['commodity']}",
+                "pickup": destination_city,
+                "dropoff": origin_city,
+                "extra_revenue_inr": load["revenue"],
+                "recommendation": "Accept load immediately to eliminate deadhead miles."
+            }
+            
+    return {"status": "NO MATCH", "message": "No direct routes found. Consider a triangular route."}
+
 if __name__ == "__main__":
     print("🚀 PetroPulse AI Orchestrator is online...")
     mcp.run(transport='stdio')
