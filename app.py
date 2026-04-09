@@ -1,4 +1,6 @@
 # app.py
+import google.generativeai as genai
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -98,3 +100,56 @@ with st.expander("View AI Business Expansion Analysis (LLM Output)", expanded=Tr
     2. **Short-Term Operations:** Shift 15% of your intra-city delivery routes to your existing EV light-commercial vehicles.
     3. **Long-Term Capital Expenditure:** Delay the purchase of 5 new diesel trucks. Allocate that capital toward the newly announced PM E-Drive scheme subsidies for heavy electric commercial vehicles.
     """)
+
+st.divider()
+st.subheader("💬 PetroPulse AI Co-Pilot")
+st.caption("Ask me to analyze routes, predict costs, or suggest hedging strategies.")
+
+GEMINI_API_KEY = "AIzaSyDfYzZ8WQoMj0caUPlkS8xsHKFY9sGVeSc" 
+genai.configure(api_key=GEMINI_API_KEY)
+
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Hello! I am the PetroPulse Orchestrator. I have access to your live fleet data, state tax matrices, and predictive ML models. How can I optimize your logistics today?"}
+    ]
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if prompt := st.chat_input("E.g., What is the tax arbitrage for Delhi to Haryana?"):
+    # Show user message in UI
+    st.chat_message("user").markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
+    # Show a loading spinner while Gemini thinks
+    with st.spinner("Analyzing fleet data and market trends..."):
+        try:
+            # --- THE HACKATHON SHORTCUT ---
+            # In a full production app, this is where the MCP Client sends the prompt to the MCP Server.
+            # For this 36-hour sprint, we inject the dashboard context directly into Gemini's prompt so it acts like the orchestrator.
+            
+            system_context = f"""
+            You are the PetroPulse AI Co-Pilot, an expert logistics financial advisor. 
+            The user currently has a fleet size of {fleet_size} trucks, averaging {avg_mileage} kmpl. 
+            The current diesel price in Delhi is ₹89.62, and the 30-day forecast predicts a hike to ₹93.22. 
+            The Haryana border price is ₹87.00. 
+            Keep your answers concise, professional, and focused on saving the user money.
+            """
+            
+            full_prompt = system_context + "\nUser Query: " + prompt
+            
+            # Call Gemini
+            response = model.generate_content(full_prompt)
+            reply = response.text
+            
+            # Show AI response in UI
+            with st.chat_message("assistant"):
+                st.markdown(reply)
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+            
+        except Exception as e:
+            st.error(f"Error connecting to AI Orchestrator: {e}")
+
