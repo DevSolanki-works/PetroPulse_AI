@@ -304,45 +304,59 @@ with col_chat:
     else:
         st.error("API Key not found!")
     
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # 1. Inject the Smart Approximation logic directly into the AI's core behavior
+    system_context = f"""
+    You are PetroPulse AI, an elite logistics financial advisor for India. 
+    CURRENT DASHBOARD CONTEXT:
+    - Active Route: {route_select} (Distance: {current_route['distance']} km).
+    - Fleet: {fleet_size} trucks averaging {avg_mileage} kmpl.
+    - Arbitrage Savings: ₹{price_diff:.2f}/L at {current_route['border_state']}.
+    
+    CRITICAL INSTRUCTION FOR UNKNOWN ROUTES:
+    If the user asks about a custom route NOT listed above (e.g., Ladakh to Tamil Nadu, or any other cities), DO NOT say you don't know. 
+    Act as a senior logistics consultant and provide an approximation:
+    1. Estimate the distance in km.
+    2. Calculate estimated fuel needed: (Distance / {avg_mileage}) * {fleet_size} trucks.
+    3. Suggest a major Indian National Highway route.
+    4. Point out 1 or 2 potential state borders along that journey where tax arbitrage might be beneficial.
+    Keep it professional, structured, and highly realistic.
+    """
+
+    # Initialize the model with the system instructions
+    model = genai.GenerativeModel(
+        'gemini-2.5-flash',
+        system_instruction=system_context
+    )
+
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Hello! I am monitoring the map, weather, and market. How can I help?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Hello! I am monitoring the map, weather, and market. Try asking me to estimate a custom route!"}]
     
     chat_container = st.container(height=300)
     for message in st.session_state.messages:
         with chat_container.chat_message(message["role"]):
             st.markdown(message["content"])
             
-    if prompt := st.chat_input("Ask about routes, weather, or savings..."):
+    if prompt := st.chat_input("Ask about custom routes, weather, or savings..."):
         chat_container.chat_message("user").markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
         
-        with st.spinner("Analyzing..."):
+        with st.spinner("Analyzing custom route logistics..."):
             try:
-                system_context = f"""
-                You are PetroPulse AI, an elite logistics financial advisor for India. 
+                # 2. Give the AI memory of the conversation
+                chat_history = []
+                for m in st.session_state.messages[:-1]:
+                    # Gemini expects 'model' instead of 'assistant' for role names
+                    role = "user" if m["role"] == "user" else "model"
+                    chat_history.append({"role": role, "parts": [m["content"]]})
                 
-                CURRENT DASHBOARD CONTEXT:
-                - Route: {route_select} (Distance: {current_route['distance']} km).
-                - Fleet: {fleet_size} trucks. Mileage: {avg_mileage} kmpl.
-                - Weather: Origin({o_cond}), Dest({d_cond}).
-                - Arbitrage Savings: ₹{price_diff:.2f}/L at {current_route['border_state']} border.
-                - Live Brent Crude: ${brent_val:.2f}. USD/INR: ₹{inr_val:.2f}.
+                # Start the chat session
+                chat = model.start_chat(history=chat_history)
+                response = chat.send_message(prompt)
                 
-                CRITICAL INSTRUCTION FOR UNKNOWN ROUTES:
-                If the user asks about a route NOT listed in the current dashboard context (e.g., Jammu to Chennai, or any other random cities), DO NOT say you don't have data. Instead, provide a highly educated APPROXIMATION:
-                1. Estimate the driving distance between the two cities in kilometers.
-                2. Use the user's provided fleet size ({fleet_size} trucks) and mileage ({avg_mileage} kmpl) to calculate the estimated total fuel required.
-                3. Assume a rough national average diesel price of ₹90/L to calculate estimated costs.
-                4. Name 1 or 2 state borders along that route where tax arbitrage (refueling) might be beneficial based on your general knowledge of Indian state taxes.
-                
-                Always be helpful, professional, and act like a senior logistics consultant.
-                """
-                
-                response = model.generate_content(system_context + "\nUser: " + prompt)
                 with chat_container.chat_message("assistant"):
                     st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
+                
             except Exception as e:
-                st.error("AI Error.")
-
+                # 3. Unmask the exact error so we can debug it if it fails again!
+                st.error(f"⚠️ API Error: {str(e)}")
