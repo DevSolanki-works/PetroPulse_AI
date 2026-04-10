@@ -370,22 +370,46 @@ with col_chat:
         st.session_state.messages.append({"role": "user", "content": prompt})
         
         with st.spinner("Analyzing custom route logistics..."):
+            # Prepare the context (Same for both models)
+            chat_history = []
+            for m in st.session_state.messages[:-1]:
+                role = "user" if m["role"] == "user" else "model"
+                chat_history.append({"role": role, "parts": [m["content"]]})
+            
             try:
-                # 2. Give the AI memory of the conversation
-                chat_history = []
-                for m in st.session_state.messages[:-1]:
-                    # Gemini expects 'model' instead of 'assistant' for role names
-                    role = "user" if m["role"] == "user" else "model"
-                    chat_history.append({"role": role, "parts": [m["content"]]})
-                
-                # Start the chat session
+                # ENGINE 1: Try Cloud AI (Google Gemini) First
                 chat = model.start_chat(history=chat_history)
                 response = chat.send_message(prompt)
+                reply = response.text
                 
                 with chat_container.chat_message("assistant"):
-                    st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                    st.markdown(reply)
+                st.session_state.messages.append({"role": "assistant", "content": reply})
                 
             except Exception as e:
-                # 3. Unmask the exact error so we can debug it if it fails again!
-                st.error(f"⚠️ API Error: {str(e)}")
+                # ENGINE 2: Seamless Fallback to Edge AI (Local Llama 3)
+                print(f"Gemini API Error: {e}") # Log the cloud error in the terminal
+                
+                try:
+                    # Show a cool UI warning that the system is failing over
+                    st.warning("☁️ Cloud API unreachable. Rerouting inference to 💻 Local Edge AI (Llama 3)...", icon="🔄")
+                    
+                    # Call your local Ollama server
+                    ollama_url = "http://localhost:11434/api/generate"
+                    ollama_payload = {
+                        "model": "llama3", # Change this to your exact local model name (e.g., llama3:8b)
+                        "prompt": system_context + "\nUser: " + prompt,
+                        "stream": False
+                    }
+                    
+                    # Make the request to your local laptop
+                    llama_response = requests.post(ollama_url, json=ollama_payload, timeout=15).json()
+                    reply = llama_response.get("response", "Error generating text locally.")
+                    
+                    with chat_container.chat_message("assistant"):
+                        st.markdown(reply)
+                    st.session_state.messages.append({"role": "assistant", "content": reply})
+                    
+                except Exception as local_e:
+                    # Ultimate Failsafe
+                    st.error("🚨 CRITICAL: Both Cloud (Gemini) and Edge (Llama) models are currently offline. Check network and local server.")
