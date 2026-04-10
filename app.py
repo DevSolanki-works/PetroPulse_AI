@@ -413,3 +413,4 @@ with col_chat:
                 except Exception as local_e:
                     # Ultimate Failsafe
                     st.error("🚨 CRITICAL: Both Cloud (Gemini) and Edge (Llama) models are currently offline. Check network and local server.")
+
