@@ -9,13 +9,13 @@ mcp = FastMCP("PetroPulse")
 # --- LOAD ML MODELS INTO MEMORY ---
 print("Loading ML Models into Orchestrator...")
 try:
-    with open('route_model.pkl', 'rb') as f:
+    with open('models/route_model.pkl', 'rb') as f:
         route_model = pickle.load(f)
-    with open('health_model.pkl', 'rb') as f:
+    with open('models/health_model.pkl', 'rb') as f:
         health_model = pickle.load(f)
     print("✅ Machine Learning Models loaded successfully!")
 except FileNotFoundError:
-    print("⚠️ WARNING: .pkl files not found. You must run train_models.py first!")
+    print("⚠️ WARNING: .pkl files not found in /models. You must run train_models.py first!")
 
 # ==========================================
 # TOOL 1: ML-Powered Fuel Predictor
