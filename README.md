@@ -24,16 +24,16 @@ The Indian logistics sector is the backbone of India's entire economy but this s
 
 ## ✨ Core Features
 
-* ** Spatial Route Arbitrage (Auto-Zooming Maps)**
+* **Spatial Route Arbitrage (Auto-Zooming Maps)**
   * Powered by `PyDeck` and `CartoDB`, our interactive 2D map dynamically auto-centers on active fleet routes.
   * Drops precise "Gold Pins" on optimal state-border refueling depots, visualizing exact VAT savings (e.g., Save ₹2.62/L at Haryana Border).
-* ** FastMCP AI Co-Pilot**
+* **FastMCP AI Co-Pilot**
   * A state-of-the-art Google Gemini 2.5 Flash agent equipped with **Smart Approximation Protocol**.
   * Reads live dashboard state (weather, Brent Crude prices, fleet size) to provide real-time, mathematically grounded financial consulting.
-* ** Predictive ML Forecaster**
+* **Predictive ML Forecaster**
   * Custom `scikit-learn` Random Forest algorithms trained on historical logistics data.
   * Accurately predicts exact fuel consumption and calculates fleet breakdown risks based on load weight and service history.
-* ** Backhaul Load Matcher**
+* **Backhaul Load Matcher**
   * A live radar that identifies trucks returning empty and matches them with priority freight, turning the old loss-making return journey into instant revenue.
 * **Live Context Engine**
   * Synthesizes live Brent Crude futures (`yfinance`) and real-time route weather (`Open-Meteo`) to adjust ETAs and financial projections instantly.
