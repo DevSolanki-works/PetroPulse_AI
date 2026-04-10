@@ -30,4 +30,3 @@ By combining real-time global market data, custom Machine Learning models, and a
 * **Machine Learning:** Scikit-Learn, Pandas, NumPy
 * **Live Data Integration:** YFinance (Market), Requests (Weather API)
 
-
