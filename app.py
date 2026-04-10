@@ -191,7 +191,7 @@ with col_arbitrage:
 
 st.divider()
 
-# --- MAIN DASHBOARD: ROW 3 (DYNAMIC HIGHWAY MAP) ---
+# --- MAIN DASHBOARD: ROW 3 (DYNAMIC HIGHWAY MAP WITH REAL ROADS) ---
 st.subheader("🛰️ Highway Radar & Refill Stations")
 st.caption("Auto-centered on active route. Gray dots = standard pumps. Gold dot = Optimal Arbitrage Pump.")
 
@@ -201,25 +201,54 @@ dest_coords = current_route["dest_coords"]
 mid_lat = (orig_coords[0] + dest_coords[0]) / 2
 mid_lon = (orig_coords[1] + dest_coords[1]) / 2
 
-# 2. Build the visual layers
-df_route = pd.DataFrame([{
-    "start": [orig_coords[1], orig_coords[0]], 
-    "end": [dest_coords[1], dest_coords[0]],
-    "name": route_select
-}])
+# 2. OSRM Real-Time Highway Routing
+@st.cache_data(ttl=3600)
+def get_actual_route(start_coords, end_coords):
+    start_lon, start_lat = start_coords[1], start_coords[0]
+    dest_lon, dest_lat = end_coords[1], end_coords[0]
+    
+    url = f"http://router.project-osrm.org/route/v1/driving/{start_lon},{start_lat};{dest_lon},{dest_lat}?overview=full&geometries=geojson"
+    try:
+        response = requests.get(url).json()
+        return response['routes'][0]['geometry']['coordinates']
+    except Exception as e:
+        return [[start_lon, start_lat], [dest_lon, dest_lat]]
+
+road_path = get_actual_route(orig_coords, dest_coords)
+
+# 3. 🧠 THE SPATIAL SNAPPING ALGORITHM 
+def snap_to_route(target_lat, target_lon, route_path):
+    """Finds the closest point on the OSRM path to our real-world station."""
+    closest_point = [target_lon, target_lat] # Default fallback
+    min_dist = float('inf')
+    
+    for lon, lat in route_path:
+        # Calculate squared Euclidean distance to find the nearest road coordinate
+        dist = (lat - target_lat)**2 + (lon - target_lon)**2
+        if dist < min_dist:
+            min_dist = dist
+            closest_point = [lon, lat] # PyDeck expects [Longitude, Latitude]
+            
+    return closest_point
+
+# 4. Build the visual layers
+df_route = pd.DataFrame([{"path": road_path, "name": route_select}])
 
 df_cities = pd.DataFrame([
     {"coords": [orig_coords[1], orig_coords[0]], "name": f"Origin: {demo_origin}", "color": [0, 255, 204, 255]},
     {"coords": [dest_coords[1], dest_coords[0]], "name": f"Destination: {demo_dest}", "color": [255, 0, 128, 255]}
 ])
 
-# Process the stations for the selected route
+# Process and SNAP the stations
 standard_stations = []
 optimal_stations = []
 
 for station in current_route["stations"]:
-    # Coordinates in PyDeck are ALWAYS [Longitude, Latitude]
-    point = {"coords": [station["coords"][1], station["coords"][0]], "name": station["name"]}
+    # Snap the realistic GPS coordinate to the exact OSRM highway line!
+    snapped_coords = snap_to_route(station["coords"][0], station["coords"][1], road_path)
+    
+    point = {"coords": snapped_coords, "name": station["name"]}
+    
     if station["optimal"]:
         point["color"] = [255, 215, 0, 255] # Solid Gold
         optimal_stations.append(point)
@@ -230,14 +259,14 @@ for station in current_route["stations"]:
 df_standard = pd.DataFrame(standard_stations)
 df_optimal = pd.DataFrame(optimal_stations)
 
-# 3. Create PyDeck Layers
-layer_line = pdk.Layer(
-    "LineLayer",
+# 5. Create PyDeck Layers
+layer_path = pdk.Layer(
+    "PathLayer",
     data=df_route,
-    get_source_position="start",
-    get_target_position="end",
-    get_color=[255, 255, 255, 60], # Faint white line representing the highway
-    get_width=2,
+    get_path="path",
+    get_color=[0, 255, 204, 200], 
+    width_scale=20,
+    width_min_pixels=3, 
 )
 
 layer_cities = pdk.Layer(
@@ -245,7 +274,7 @@ layer_cities = pdk.Layer(
     data=df_cities,
     get_position="coords",
     get_color="color",
-    get_radius=8000, # Much smaller!
+    get_radius=8000, 
     pickable=True
 )
 
@@ -254,7 +283,7 @@ layer_standard_pumps = pdk.Layer(
     data=df_standard,
     get_position="coords",
     get_color="color",
-    get_radius=4000, # Tiny pins for regular gas stations
+    get_radius=4000, 
     pickable=True
 )
 
@@ -263,11 +292,11 @@ layer_optimal_pump = pdk.Layer(
     data=df_optimal,
     get_position="coords",
     get_color="color",
-    get_radius=9000, # Slightly bigger so it stands out
+    get_radius=9000, 
     pickable=True
 )
 
-# 4. Render the Map
+# 6. Render the Map
 st.pydeck_chart(pdk.Deck(
     map_provider="carto",
     map_style="dark",
@@ -277,7 +306,7 @@ st.pydeck_chart(pdk.Deck(
         zoom=current_route["zoom"], 
         pitch=0, 
     ),
-    layers=[layer_line, layer_standard_pumps, layer_optimal_pump, layer_cities],
+    layers=[layer_path, layer_standard_pumps, layer_optimal_pump, layer_cities],
     tooltip={"text": "{name}"} 
 ))
 
@@ -298,7 +327,7 @@ with col_backhaul:
             st.metric(label="New Revenue Generated", value=f"+ ₹{backhaul_rev:,.2f}")
 
 with col_chat:
-    st.subheader("💬 PetroPulse AI Co-Pilot")
+    st.subheader("💬 PetroPulse AI BOT")
     if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
     else:
