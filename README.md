@@ -139,7 +139,7 @@ streamlit run app.py
 ---
 
 ## 💡 Hackathon Notes
-This project was conceived, designed, and deployed within a strict 24-hour hackathon timeframe. 
+This project was conceived, designed, and deployed within a strict 36-hour hackathon timeframe. 
 * The Machine Learning models are custom-trained on synthesized datasets representing real-world Indian logistics conditions.
 * The API integrations (YFinance and Open-Meteo) are 100% live and fetching real-time data.
 * We completely bypassed traditional web-scraping for fuel prices by mapping global Brent Crude volatility directly to local OMC spot prices.
